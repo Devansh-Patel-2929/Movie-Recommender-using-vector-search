@@ -1,0 +1,12 @@
+# Ignore environment variable files
+.env
+.env.*
+
+# VS Code settings
+.vscode/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
