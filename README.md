@@ -1,5 +1,3 @@
----
-
 # 🎬 **CineAI: Intelligent Movie Recommendations**
 
 > ⚠️ **Note:** This project is a **work in progress**. Some features are under active development and may change in updates.
