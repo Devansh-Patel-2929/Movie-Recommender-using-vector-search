@@ -33,10 +33,11 @@ def vector_search(query_text,top_k=5):
 
     db_query = """
         SELECT TOP @top_k
+            c.id,
             c.title,
-            c.genre,
+            c.genres,
             c.rating,
-            c.release_year,
+            c.year,
             c.plot_summary,
             c.plot_synopsis,
             VectorDistance(c.embedding, @query_embedding) AS similarity_score
@@ -112,10 +113,11 @@ def find_similar(movie_name: str , top_k=5):
     
     db_query = """
         SELECT TOP @num_results
+            c.id,
             c.title,
-            c.genre,
+            c.genres,
             c.rating,
-            c.release_year,
+            c.year,
             c.plot_summary,
             c.plot_synopsis,
             VectorDistance(c.embedding, @embedding) AS similarity_score
@@ -146,12 +148,12 @@ def find_similar(movie_name: str , top_k=5):
         return []
 
 
-query = "Find action movies with sad ending"
-results = vector_search(query,top_k=3)
-for idx, item in enumerate(results):
-    print(item)
+# query = "Find action movies with sad ending"
+# results = vector_search(query,top_k=3)
+# for idx, item in enumerate(results):
+#     print(item)
 
-movie = "Wet Hot American Summer"
+# movie = "Wet Hot American Summer"
 
-results1 = find_similar(movie,5)
-print (results1)
+# results1 = find_similar(movie,5)
+# print (results1)
