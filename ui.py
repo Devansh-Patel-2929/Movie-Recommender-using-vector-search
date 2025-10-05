@@ -1,6 +1,6 @@
 import streamlit as st
 from typing import List, Dict, Any
-import app
+import vector_search
 import os
 
 # UI COMPONENTS
@@ -178,7 +178,7 @@ def main_app():
         if st.button("✨ Generate AI Recommendations", use_container_width=True, type="primary"):
             if prompt:
                 with st.spinner("🔮 Analyzing your vibe with Azure AI..."):
-                    st.session_state.recommendations = app.vector_search(prompt, num_recs)
+                    st.session_state.recommendations = vector_search.vector_search(prompt, num_recs)
                     st.session_state.mode = "rag"
                     st.session_state.search_term = f'for "{prompt}"'
                     # Reset all flip states when new recommendations come
@@ -204,7 +204,7 @@ def main_app():
         if st.button("🔍 Find Similar Movies", use_container_width=True, type="primary"):
             if movie_name:
                 with st.spinner("📡 Searching vector database..."):
-                    st.session_state.recommendations = app.find_similar(movie_name, num_similar)
+                    st.session_state.recommendations = vector_search.find_similar(movie_name, num_similar)
                     st.session_state.mode = "similar"
                     st.session_state.search_term = f'similar to "{movie_name}"'
                     # Reset all flip states when new recommendations come
