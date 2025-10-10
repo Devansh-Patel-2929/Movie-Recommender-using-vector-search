@@ -5,8 +5,7 @@ import os
 
 # UI COMPONENTS
 
-def create_rating_stars(rating_str):
-    rating = float(rating_str)
+def create_rating_stars(rating):
     full_stars = int(rating / 2)
     half_star = 1 if (rating / 2 - full_stars) >= 0.5 else 0
     empty_stars = 5 - full_stars - half_star
@@ -125,6 +124,37 @@ def load_css():
     with open(css_file) as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
+def search_movie_titles(query: str, movie_titles: List[str], max_results: int = 5) -> List[str]:
+    """Search for movie titles that match the query"""
+    if not query:
+        return []
+    
+    query = query.lower().strip()
+    matches = []
+    
+    for title in movie_titles:
+        if query in title.lower():
+            matches.append(title)
+    
+    # Sort by how early the query appears in the title
+    matches.sort(key=lambda x: x.lower().find(query))
+    
+    return matches[:max_results]
+
+# sample list of movie titles
+MOVIE_TITLES = [
+    "The Shawshank Redemption", "The Godfather", "The Dark Knight", "Pulp Fiction", 
+    "Forrest Gump", "Inception", "The Matrix", "Goodfellas", "The Lord of the Rings", 
+    "Fight Club", "Star Wars", "The Avengers", "Titanic", "Jurassic Park", 
+    "The Lion King", "Back to the Future", "The Silence of the Lambs", "Casablanca",
+    "Psycho", "The Godfather Part II", "The Empire Strikes Back", "The Social Network",
+    "Parasite", "Spirited Away", "Interstellar", "The Departed", "Whiplash",
+    "Gladiator", "The Prestige", "Django Unchained", "The Shining", "Alien",
+    "Avengers: Endgame", "The Dark Knight Rises", "Inglourious Basterds",
+    "Saving Private Ryan", "The Green Mile", "American Beauty", "The Usual Suspects",
+    "Leon: The Professional", "The Pianist", "City of God", "Once Upon a Time in Hollywood",
+    "Joker", "1917", "Parasite", "Get Out", "La La Land", "Mad Max: Fury Road"
+]
 
 # MAIN STREAMLIT APP
 
@@ -145,16 +175,21 @@ def main_app():
         st.session_state.mode = "welcome"
         st.session_state.search_term = ""
         st.session_state.current_filters = {
-            'year_range': (1950, 2024),
+            'year_range': (1920, 2024),
             'rating_range': (0.0, 10.0),
             'selected_genres': []
         }
+        st.session_state.selected_movie = ""
     
-    # Predefined list of genres
-    PREDEFINED_GENRES = ['Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime', 'Drama', 'Family', 'Fantasy', 'Film-Noir', 'History', 'Horror', 'Music', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Sport', 'Thriller', 'War', 'Western']
+    # sample list of genres
+    PREDEFINED_GENRES = [
+        "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", 
+        "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery",
+        "Romance", "Science Fiction", "TV Movie", "Thriller", "War", "Western"
+    ]
     
-    # Year range
-    MIN_YEAR = 1950
+    # Year range 
+    MIN_YEAR = 1920
     MAX_YEAR = 2024
 
     # HEADER
@@ -171,7 +206,6 @@ def main_app():
     st.markdown("### 🎯 Find Your Perfect Movie")
     st.markdown("Discover movies using AI-powered search or find similar titles")
     
-    # track active tab
     active_tab = st.radio(
         "Choose search type:",
         ["🧠 AI Mood Search", "🔍 Find Similar Movies"],
@@ -184,7 +218,7 @@ def main_app():
     movie_name = ""
     num_recs = 3
     
-    # search interface based on active tab
+    # Display the appropriate search interface based on active tab
     if active_tab == "🧠 AI Mood Search":
         st.markdown("**Describe what you're in the mood for**")
         search1, button_Prompt_slider = st.columns([2,1],gap="medium")
@@ -214,12 +248,43 @@ def main_app():
                 help="Select how many movies you want to see"
             )
         with search2:
-            movie_name = st.text_input(
-                "Enter a movie title:",
-                placeholder="e.g., Inception, The Shawshank Redemption...",
+            # Movie search with autocomplete
+            search_query = st.text_input(
+                "Search for a movie:",
+                placeholder="Start typing to search for movies... and press ENTER",
                 key="similar_input",
                 label_visibility="collapsed"
             )
+            
+            # Search for matching movies
+            if search_query:
+                matching_movies = search_movie_titles(search_query, MOVIE_TITLES, max_results=5)
+                
+                if matching_movies:
+                    st.markdown("**🔍 Matching Movies:**")
+                    
+                    # Create columns for the movie buttons
+                    movie_cols = st.columns(len(matching_movies))
+                    
+                    for idx, movie_title in enumerate(matching_movies):
+                        with movie_cols[idx]:
+                            if st.button(
+                                f"🎬 {movie_title}", 
+                                key=f"movie_btn_{idx}",
+                                use_container_width=True,
+                                type="secondary" if st.session_state.selected_movie != movie_title else "primary"
+                            ):
+                                st.session_state.selected_movie = movie_title
+                                st.rerun()
+                    
+                    # Show selected movie
+                    if st.session_state.selected_movie:
+                        st.success(f"✅ Selected: **{st.session_state.selected_movie}**")
+                        movie_name = st.session_state.selected_movie
+                else:
+                    st.info("🔍 No matching movies found. Try a different search term.")
+            else:
+                st.info("💡 Start typing to search for movies...")
 
     # FILTERS SECTION
     filter_col1, filter_col2, filter_col3 = st.columns(3, gap="large")
@@ -281,15 +346,15 @@ def main_app():
     # Single dynamic button
     if st.button(button_label, use_container_width=True, type=button_type):
         if active_tab == "🧠 AI Mood Search":
-            # AI Mood Search logic
+            # AI Mood Search 
             if prompt:
                 with st.spinner("🔮 Analyzing your vibe with Azure AI..."):
-                    st.session_state.recommendations = vector_search.vector_search(
+                    st.session_state.recommendations = vector_search.search_with_filtersAndPrompt(
                         query_text=prompt,
                         top_k=num_recs,
                         year_range=st.session_state.current_filters['year_range'],
                         rating_range=st.session_state.current_filters['rating_range'],
-                        selected_genres=st.session_state.current_filters['selected_genres']
+                        genre=st.session_state.current_filters['selected_genres']
                     )
                     st.session_state.mode = "rag"
                     st.session_state.search_term = f'for "{prompt}"'
@@ -301,15 +366,15 @@ def main_app():
                 st.warning("Please describe what you're in the mood for!")
                 
         else:  # "🔍 Find Similar Movies"
-            # Find Similar Movies logic
-            if movie_name:
+            if st.session_state.selected_movie:
+                movie_name = st.session_state.selected_movie
                 with st.spinner("📡 Searching vector database..."):
                     st.session_state.recommendations = vector_search.find_similar(
                         movie_name=movie_name,
                         top_k=num_recs,
                         year_range=st.session_state.current_filters['year_range'],
                         rating_range=st.session_state.current_filters['rating_range'],
-                        selected_genres=st.session_state.current_filters['selected_genres']
+                        genre=st.session_state.current_filters['selected_genres']
                     )
                     st.session_state.mode = "similar"
                     st.session_state.search_term = f'similar to "{movie_name}"'
@@ -318,7 +383,7 @@ def main_app():
                         st.session_state[f"flip_state_{movie['id']}"] = False
                         st.session_state[f"summary_state_{movie['id']}"] = False
             else:
-                st.warning("Please enter a movie title!")
+                st.warning("Please select a movie from the search results!")
     
     st.markdown('</div>', unsafe_allow_html=True)
 

@@ -89,13 +89,34 @@ def get_embedding(container, movie_name: str):
 
 #find similar movies based on input
 
-def find_similar(movie_name: str , top_k=5):
+def find_similar(movie_name: str, top_k=5 ,year_range = [1921,2025], rating_range = [0.0,10.0], genre = None):
     query_embedding = get_embedding(container,movie_name)
     if query_embedding is None:
         print(f"Error: Could not find embedding for source movie '{movie_name}'.")
         return []
     
-    db_query = """
+    if genre == None:
+        genre = []
+
+    filters = get_filters(year_range,rating_range,genre)
+
+    if filters:
+        db_query = f"""
+        SELECT TOP @num_results
+            c.id,
+            c.title,
+            c.genres,
+            c.rating,
+            c.year,
+            c.plot_summary,
+            c.plot_synopsis,
+            VectorDistance(c.embedding, @embedding) AS similarity_score
+        FROM c
+        WHERE {filters}
+        ORDER BY VectorDistance(c.embedding, @embedding)
+    """
+    else:
+        db_query = f"""
         SELECT TOP @num_results
             c.id,
             c.title,
@@ -151,12 +172,12 @@ def get_filters(year_range: Tuple[int,int], rating_range: Tuple[float,float], ge
 
 # search function with filters
 
-def search_with_filtersAndPrompt(prompt , top_k=5 ,year_range = [1921,2025], rating_range = [0.0,10.0], genre = None):
+def search_with_filtersAndPrompt(query_text:str, top_k=5 ,year_range = [1921,2025], rating_range = [0.0,10.0], genre = None):
     if genre == None:
-        genre_list = []
+        genre = []
     
-    query_embedding = embedding_model.embed_query(prompt)
-    filters = get_filters(year_range,rating_range,genre_list)
+    query_embedding = embedding_model.embed_query(query_text)
+    filters = get_filters(year_range,rating_range,genre)
 
     if filters:
         db_query = f"""
