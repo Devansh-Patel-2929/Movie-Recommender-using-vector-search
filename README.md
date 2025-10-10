@@ -122,8 +122,9 @@ CineAI/
 * **Python** – for backend and logic
 
 ---
-<img width="2272" height="1051" alt="Screenshot 2025-10-05 211827" src="https://github.com/user-attachments/assets/5921458f-27ec-410a-b39f-f630512a5fa5" />
-<img width="2293" height="1193" alt="Screenshot 2025-10-05 211813" src="https://github.com/user-attachments/assets/453a4176-ad04-4f4d-9df9-ec0d22b70213" />
+<img width="1726" height="887" alt="Screenshot 2025-10-10 172610" src="https://github.com/user-attachments/assets/8d9c4bf4-02dd-4178-86fd-3e8993993348" />
+<img width="1722" height="934" alt="Screenshot 2025-10-10 172629" src="https://github.com/user-attachments/assets/d711659c-13db-4419-af07-a32d06f39ec8" />
+
 
 ## 🧰 **Requirements File**
 
