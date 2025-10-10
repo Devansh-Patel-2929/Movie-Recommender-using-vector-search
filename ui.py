@@ -1,5 +1,5 @@
 import streamlit as st
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import vector_search
 import os
 
@@ -144,6 +144,18 @@ def main_app():
         st.session_state.recommendations = []
         st.session_state.mode = "welcome"
         st.session_state.search_term = ""
+        st.session_state.current_filters = {
+            'year_range': (1950, 2024),
+            'rating_range': (0.0, 10.0),
+            'selected_genres': []
+        }
+    
+    # Predefined list of genres
+    PREDEFINED_GENRES = ['Action', 'Adventure', 'Animation', 'Biography', 'Comedy', 'Crime', 'Drama', 'Family', 'Fantasy', 'Film-Noir', 'History', 'Horror', 'Music', 'Musical', 'Mystery', 'Romance', 'Sci-Fi', 'Sport', 'Thriller', 'War', 'Western']
+    
+    # Year range
+    MIN_YEAR = 1950
+    MAX_YEAR = 2024
 
     # HEADER
     st.markdown("""
@@ -156,29 +168,129 @@ def main_app():
     """, unsafe_allow_html=True)
 
     # SEARCH SECTION
-    
     st.markdown("### 🎯 Find Your Perfect Movie")
     st.markdown("Discover movies using AI-powered search or find similar titles")
     
-    tab1, tab2 = st.tabs(["🧠 AI Mood Search", "🔍 Find Similar Movies"])
+    # track active tab
+    active_tab = st.radio(
+        "Choose search type:",
+        ["🧠 AI Mood Search", "🔍 Find Similar Movies"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
     
-    with tab1:
+    # Initialize variables
+    prompt = ""
+    movie_name = ""
+    num_recs = 3
+    
+    # search interface based on active tab
+    if active_tab == "🧠 AI Mood Search":
         st.markdown("**Describe what you're in the mood for**")
-        col1, col2 = st.columns([3, 1])
-        with col1:
+        search1, button_Prompt_slider = st.columns([2,1],gap="medium")
+        with button_Prompt_slider:
+            num_recs = st.slider(
+                "Number of recommendations", 
+                1, 6, 3, 
+                key="prompt_slider",
+                help="Select how many movies you want to see"
+            )
+        with search1:
             prompt = st.text_input(
                 "Movie mood description:",
                 placeholder="e.g., a mind-bending sci-fi thriller with plot twists and philosophical themes...",
                 key="rag_input",
                 label_visibility="collapsed"
             )
-        with col2:
-            num_recs = st.slider("Number of recommendations", 1, 6, 3, key="rag_slider")
         
-        if st.button("✨ Generate AI Recommendations", use_container_width=True, type="primary"):
+    else:  # "🔍 Find Similar Movies"
+        st.markdown("**Find movies similar to ones you love**")
+        search2, button_similar_slider = st.columns([2,1],gap="medium")
+        with button_similar_slider:
+            num_recs = st.slider(
+                "Number of recommendations", 
+                1, 6, 3, 
+                key="similar_slider",
+                help="Select how many movies you want to see"
+            )
+        with search2:
+            movie_name = st.text_input(
+                "Enter a movie title:",
+                placeholder="e.g., Inception, The Shawshank Redemption...",
+                key="similar_input",
+                label_visibility="collapsed"
+            )
+
+    # FILTERS SECTION
+    filter_col1, filter_col2, filter_col3 = st.columns(3, gap="large")
+    
+    with filter_col1:
+        st.markdown("**🎬 Year Range**")
+        year_range = st.slider(
+            "Select year range:",
+            min_value=MIN_YEAR,
+            max_value=MAX_YEAR,
+            value=st.session_state.current_filters['year_range'],
+            key="year_slider",
+            label_visibility="collapsed"
+        )
+        st.markdown(f"**Selected:** {year_range[0]} - {year_range[1]}")
+    
+    with filter_col2:
+        st.markdown("**⭐ Rating Range**")
+        rating_range = st.slider(
+            "Select rating range:",
+            min_value=0.0,
+            max_value=10.0,
+            value=st.session_state.current_filters['rating_range'],
+            step=0.5,
+            key="rating_slider",
+            label_visibility="collapsed"
+        )
+        st.markdown(f"**Selected:** {rating_range[0]} - {rating_range[1]}")
+    
+    with filter_col3:
+        st.markdown("**🎭 Genres**")
+        selected_genres = st.multiselect(
+            "Select genres:",
+            options=PREDEFINED_GENRES,
+            default=st.session_state.current_filters['selected_genres'],
+            key="genre_multiselect",
+            label_visibility="collapsed"
+        )
+        st.markdown(f"**Selected:** {', '.join(selected_genres) if selected_genres else 'All genres'}")
+
+    # Update current filters
+    st.session_state.current_filters = {
+        'year_range': year_range,
+        'rating_range': rating_range,
+        'selected_genres': selected_genres
+    }
+
+    # SINGLE ACTION BUTTON SECTION
+    st.markdown("### 🚀 Generate Recommendations")
+    
+    # Determine button label and type based on active tab
+    if active_tab == "🧠 AI Mood Search":
+        button_label = "✨ Generate AI Recommendations"
+        button_type = "primary"
+    else:
+        button_label = "🔍 Find Similar Movies"
+        button_type = "primary"
+    
+    # Single dynamic button
+    if st.button(button_label, use_container_width=True, type=button_type):
+        if active_tab == "🧠 AI Mood Search":
+            # AI Mood Search logic
             if prompt:
                 with st.spinner("🔮 Analyzing your vibe with Azure AI..."):
-                    st.session_state.recommendations = vector_search.vector_search(prompt, num_recs)
+                    st.session_state.recommendations = vector_search.vector_search(
+                        query_text=prompt,
+                        top_k=num_recs,
+                        year_range=st.session_state.current_filters['year_range'],
+                        rating_range=st.session_state.current_filters['rating_range'],
+                        selected_genres=st.session_state.current_filters['selected_genres']
+                    )
                     st.session_state.mode = "rag"
                     st.session_state.search_term = f'for "{prompt}"'
                     # Reset all flip states when new recommendations come
@@ -187,24 +299,18 @@ def main_app():
                         st.session_state[f"summary_state_{movie['id']}"] = False
             else:
                 st.warning("Please describe what you're in the mood for!")
-    
-    with tab2:
-        st.markdown("**Find movies similar to ones you love**")
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            movie_name = st.text_input(
-                "Enter a movie title:",
-                placeholder="e.g., Inception, The Shawshank Redemption...",
-                key="similar_input",
-                label_visibility="collapsed"
-            )
-        with col2:
-            num_similar = st.slider("Number of similar movies", 1, 6, 3, key="similar_slider")
-        
-        if st.button("🔍 Find Similar Movies", use_container_width=True, type="primary"):
+                
+        else:  # "🔍 Find Similar Movies"
+            # Find Similar Movies logic
             if movie_name:
                 with st.spinner("📡 Searching vector database..."):
-                    st.session_state.recommendations = vector_search.find_similar(movie_name, num_similar)
+                    st.session_state.recommendations = vector_search.find_similar(
+                        movie_name=movie_name,
+                        top_k=num_recs,
+                        year_range=st.session_state.current_filters['year_range'],
+                        rating_range=st.session_state.current_filters['rating_range'],
+                        selected_genres=st.session_state.current_filters['selected_genres']
+                    )
                     st.session_state.mode = "similar"
                     st.session_state.search_term = f'similar to "{movie_name}"'
                     # Reset all flip states when new recommendations come
@@ -224,11 +330,28 @@ def main_app():
             </h2>
         """, unsafe_allow_html=True)
         
+        # Show active filters
+        active_filters = []
+        if st.session_state.current_filters['year_range'] != (MIN_YEAR, MAX_YEAR):
+            active_filters.append(f"Years: {st.session_state.current_filters['year_range'][0]}-{st.session_state.current_filters['year_range'][1]}")
+        
+        if st.session_state.current_filters['rating_range'] != (0.0, 10.0):
+            active_filters.append(f"Rating: {st.session_state.current_filters['rating_range'][0]}-{st.session_state.current_filters['rating_range'][1]}")
+        
+        if st.session_state.current_filters['selected_genres']:
+            active_filters.append(f"Genres: {', '.join(st.session_state.current_filters['selected_genres'])}")
+        
+        if active_filters:
+            st.info(f"📊 Active filters: {', '.join(active_filters)}")
+        
         num_movies = len(st.session_state.recommendations)
         cols = st.columns(min(num_movies, 3))
         
         for i, movie in enumerate(st.session_state.recommendations):
             display_movie_card(movie, cols[i % 3])
+    
+    elif st.session_state.mode != "welcome":
+        st.warning("🤷 No movies found matching your search criteria and filters. Try adjusting your search or filters.")
 
     # FOOTER
     st.markdown("""

@@ -1,10 +1,9 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from azure.cosmos import CosmosClient
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, Optional, List
 
 from dotenv import load_dotenv
-import streamlit as st
 import os
 
 load_dotenv()
@@ -61,23 +60,6 @@ def vector_search(query_text,top_k=5):
         print("Error in vector search: {e} could not find vector")
         return []
     
-
-# def get_average_rating():
-#     db_query = """
-#         SELECT VALUE AVG(StringToNumber(c.rating))
-#         FROM c
-#         WHERE IS_DEFINED(c.rating) AND IS_STRING(c.rating) AND NOT IS_NULL(c.rating)
-#     """
-#     results = container.query_items(
-#         query=db_query,
-#         enable_cross_partition_query=True
-#     )
-#     try:
-#         average_rating = next(results) 
-#         return average_rating if average_rating is not None else 0.0
-#     except StopIteration:
-#         return 0.0
-
     
 def get_embedding(container, movie_name: str):
     find_movie_query = """
@@ -104,6 +86,8 @@ def get_embedding(container, movie_name: str):
         print(f"Error fetching embedding for movie '{movie_name}': {e}")
         return None
 
+
+#find similar movies based on input
 
 def find_similar(movie_name: str , top_k=5):
     query_embedding = get_embedding(container,movie_name)
@@ -148,12 +132,85 @@ def find_similar(movie_name: str , top_k=5):
         return []
 
 
-# query = "Find action movies with sad ending"
-# results = vector_search(query,top_k=3)
-# for idx, item in enumerate(results):
-#     print(item)
+# converts Range of filters to a String query
+
+def get_filters(year_range: Tuple[int,int], rating_range: Tuple[float,float], genres_list: List[str]) -> str:
+    conditions = []
+    conditions.append(f"c.year >= {year_range[0]}  AND c.year <= {year_range[1]}")
+    conditions.append(f"c.rating >= {rating_range[0]} AND c.rating <= {rating_range[1]}")
+    
+    if genres_list:
+        genre_filter = []
+        for genres in genres_list:
+            escaped_genre = genres.replace("'", "''")
+            genre_filter.append(f"ARRAY_CONTAINS(c.genres, '{escaped_genre})")
+        if genre_filter:
+            conditions.append(f"({' OR '.join(genre_filter)})")
+    return " AND ".join(conditions) if conditions else ""
+
+
+# search function with filters
+
+def search_with_filtersAndPrompt(prompt , top_k=5 ,year_range = [1921,2025], rating_range = [0.0,10.0], genre = None):
+    if genre == None:
+        genre_list = []
+    
+    query_embedding = embedding_model.embed_query(prompt)
+    filters = get_filters(year_range,rating_range,genre_list)
+
+    if filters:
+        db_query = f"""
+            SELECT TOP @num_results
+                c.id,
+                c.title,
+                c.genres,
+                c.rating,
+                c.year,
+                c.plot_summary,
+                c.plot_synopsis,
+                VectorDistance(c.embedding, @embedding) AS similarity_score
+            FROM c
+            WHERE {filters}
+            ORDER BY VectorDistance(c.embedding, @embedding)
+        """
+    else:
+        db_query = f"""
+            SELECT TOP @num_results
+                c.id,
+                c.title,
+                c.genres,
+                c.rating,
+                c.year,
+                c.plot_summary,
+                c.plot_synopsis,
+                VectorDistance(c.embedding, @embedding) AS similarity_score
+            FROM c
+            ORDER BY VectorDistance(c.embedding, @embedding)
+        """
+    parameters = [
+        {"name": "@embedding", "value": query_embedding},
+        {"name": "@num_results", "value": top_k}
+    ]
+
+    try:
+        results = list(container.query_items(
+            query=db_query,
+            parameters=parameters,
+            enable_cross_partition_query=True
+        ))
+        return results
+    
+    except Exception as e:
+        print("Error in vector search: {e} could not find vector")
+        return []
+
+    
+    
+
+
+
 
 # movie = "Wet Hot American Summer"
 
-# results1 = find_similar(movie,5)
+# results1 = find_similar(movie,2)
 # print (results1)
